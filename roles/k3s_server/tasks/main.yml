@@ -26,3 +26,60 @@
     host: 127.0.0.1
     port: 6443
     timeout: 180
+
+# Allow the SSH user to run `kubectl` without sudo by:
+#   1. creating a `k3s` group
+#   2. adding the user to it
+#   3. having k3s write kubeconfig with mode 0640 and group=k3s
+# K3S_KUBECONFIG_{MODE,GROUP} are honored every time k3s rewrites the file
+# (e.g. on cert rotation), so this stays sticky.
+
+- name: Create k3s group
+  ansible.builtin.group:
+    name: k3s
+    state: present
+
+- name: Add ansible_user ({{ ansible_user }}) to k3s group
+  ansible.builtin.user:
+    name: "{{ ansible_user }}"
+    groups: k3s
+    append: true
+
+- name: Configure k3s service env to set kubeconfig mode + group
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/k3s.service.env
+    mode: "0644"
+    content: |
+      K3S_KUBECONFIG_MODE=0640
+      K3S_KUBECONFIG_GROUP=k3s
+  register: k3s_env
+
+- name: Re-chmod existing kubeconfig immediately (k3s only re-writes on cert events)
+  ansible.builtin.file:
+    path: /etc/rancher/k3s/k3s.yaml
+    mode: "0640"
+    group: k3s
+  failed_when: false   # may not exist on freshest installs
+
+- name: Re-chmod /etc/rancher/k3s directory so group can traverse it
+  ansible.builtin.file:
+    path: /etc/rancher/k3s
+    mode: "0755"
+  failed_when: false
+
+- name: Restart k3s if env file changed (picks up KUBECONFIG_GROUP/MODE)
+  ansible.builtin.systemd:
+    name: k3s
+    state: restarted
+    daemon_reload: true
+  when: k3s_env.changed
+
+- name: Drop a /etc/profile.d snippet so KUBECONFIG is set on login
+  ansible.builtin.copy:
+    dest: /etc/profile.d/k3s-kubeconfig.sh
+    mode: "0644"
+    content: |
+      # Set KUBECONFIG for users in the k3s group so `kubectl` works without sudo.
+      if id -nG 2>/dev/null | tr ' ' '\n' | grep -qx k3s; then
+          export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+      fi
