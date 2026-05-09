@@ -1,0 +1,82 @@
+---
+# Use the k3s in-cluster Helm controller (HelmChart CRD) so we don't need a
+# helm CLI on the laptop. The MetalLB IPAddressPools and ingress-nginx are
+# raw kustomize manifests.
+
+# First pass installs CRDs (e.g. MetalLB IPAddressPool/L2Advertisement); same
+# `apply -k` cannot also create CRs against those CRDs in one shot because the
+# apiserver hasn't registered them yet. Retry up to 3 times — second pass picks
+# up the CRs once the CRDs are live.
+- name: Apply cluster bootstrap kustomization (namespaces, MetalLB, ingress, k8s_gateway)
+  ansible.builtin.command:
+    cmd: kubectl --kubeconfig={{ local_kubeconfig }} apply -k cluster/
+    chdir: "{{ playbook_dir }}"
+  register: cluster_apply
+  retries: 3
+  delay: 15
+  until: cluster_apply.rc == 0
+  changed_when: "'created' in (cluster_apply.stdout | default('')) or 'configured' in (cluster_apply.stdout | default(''))"
+
+- name: Wait for MetalLB controller
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ local_kubeconfig }}"
+    api_version: apps/v1
+    kind: Deployment
+    namespace: metallb-system
+    name: controller
+  register: metallb_ctrl
+  until: (metallb_ctrl.resources | length > 0) and (metallb_ctrl.resources[0].status.readyReplicas | default(0) | int >= 1)
+  retries: 60
+  delay: 5
+
+- name: Wait for k3s Helm controller to install k8s_gateway
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ local_kubeconfig }}"
+    api_version: apps/v1
+    kind: Deployment
+    namespace: kube-system
+    name: k8s-gateway
+  register: k8s_gw
+  until: (k8s_gw.resources | length > 0) and (k8s_gw.resources[0].status.readyReplicas | default(0) | int >= 1)
+  retries: 90
+  delay: 10
+
+- name: Wait for ingress-nginx controller
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ local_kubeconfig }}"
+    api_version: apps/v1
+    kind: Deployment
+    namespace: ingress-nginx
+    name: ingress-nginx-controller
+  register: nginx
+  until: (nginx.resources | length > 0) and (nginx.resources[0].status.readyReplicas | default(0) | int >= 1)
+  retries: 90
+  delay: 10
+
+- name: Patch k8s-gateway service to a fixed IP and pool
+  kubernetes.core.k8s:
+    kubeconfig: "{{ local_kubeconfig }}"
+    state: patched
+    kind: Service
+    name: k8s-gateway
+    namespace: kube-system
+    definition:
+      metadata:
+        annotations:
+          metallb.universe.tf/loadBalancerIPs: "{{ k8s_gateway_ip }}"
+          metallb.io/address-pool: pool-10-0-0
+      spec:
+        type: LoadBalancer
+        loadBalancerIP: "{{ k8s_gateway_ip }}"
+
+- name: Show k8s_gateway external IP
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ local_kubeconfig }}"
+    kind: Service
+    name: k8s-gateway
+    namespace: kube-system
+  register: k8s_gw_svc
+
+- name: Confirm
+  ansible.builtin.debug:
+    msg: "k8s_gateway: {{ (k8s_gw_svc.resources[0].status.loadBalancer.ingress | default([{}]))[0].ip | default('PENDING') }}"

@@ -1,0 +1,20 @@
+# secrets and local state
+.pf-creds
+.k3s_token
+.ansible-facts/
+*.retry
+galaxy_roles/
+collections/
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# editor
+.idea/
+.vscode/
+*.swp
+.DS_Store
+.venv-domain/

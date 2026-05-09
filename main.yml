@@ -1,0 +1,80 @@
+---
+# amun-kubernetes — install k3s on the rpid* fleet and bootstrap cluster services.
+#
+# Plays:
+#   1. Prereqs on every node (cgroup memory, sysctl, modprobe).
+#   2. Init the first server (rpid0) with embedded etcd.
+#   3. Join the remaining servers (rpid1, rpid2) — serial=1 to avoid etcd race.
+#   4. Join the agents (rpid3..rpid10).
+#   5. Label nodes for MetalLB + Longhorn placement.
+#   6. Apply cluster-bootstrap kustomization (namespaces, MetalLB pools, k8s_gateway, ingress).
+#   7. Run domain.py to ensure pfSense Domain Override.
+
+- name: Prereqs on every node
+  hosts: k3s_servers:k3s_agents
+  become: true
+  gather_facts: true
+  tags: ["prereqs"]
+  roles:
+    - role: k3s_prereqs
+
+- name: Initialize cluster on first server (rpid0.lan)
+  hosts: rpid0.lan
+  become: true
+  gather_facts: false
+  tags: ["k3s", "k3s_servers"]
+  roles:
+    - role: k3s_server
+      vars:
+        k3s_action: init
+
+- name: Join remaining servers
+  hosts: "k3s_servers:!rpid0.lan"
+  become: true
+  gather_facts: false
+  serial: 1
+  tags: ["k3s", "k3s_servers"]
+  roles:
+    - role: k3s_server
+      vars:
+        k3s_action: join
+
+- name: Install k3s on agents
+  hosts: k3s_agents
+  become: true
+  gather_facts: false
+  tags: ["k3s", "k3s_agents"]
+  roles:
+    - role: k3s_agent
+
+- name: Fetch kubeconfig to localhost
+  hosts: rpid0.lan
+  become: true
+  gather_facts: false
+  tags: ["k3s", "kubeconfig"]
+  roles:
+    - role: kubeconfig_fetch
+
+- name: Label nodes (zones, storage role)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tags: ["bootstrap", "labels"]
+  roles:
+    - role: labels
+
+- name: Apply cluster bootstrap (namespaces, MetalLB, ingress, k8s_gateway)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tags: ["bootstrap", "helm"]
+  roles:
+    - role: helm_releases
+
+- name: Ensure pfSense Domain Override for k8s.lan
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tags: ["pfsense"]   # interactive — skipped by default; run via `./domain.py`
+  roles:
+    - role: pfsense_dns

@@ -1,0 +1,32 @@
+---
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: ingress-nginx
+  namespace: kube-system
+spec:
+  chart: ingress-nginx
+  repo: https://kubernetes.github.io/ingress-nginx
+  targetNamespace: ingress-nginx
+  createNamespace: true
+  valuesContent: |-
+    controller:
+      kind: Deployment
+      replicaCount: 2
+      ingressClassResource:
+        default: true
+      service:
+        type: LoadBalancer
+        annotations:
+          metallb.io/address-pool: pool-10-0-0
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 256Mi
+      admissionWebhooks:
+        enabled: true
+      metrics:
+        enabled: false

@@ -1,0 +1,28 @@
+---
+- name: Check if k3s server is already running this version
+  ansible.builtin.command: /usr/local/bin/k3s --version
+  register: k3s_installed_version
+  failed_when: false
+  changed_when: false
+
+- name: Decide install action
+  ansible.builtin.set_fact:
+    k3s_present: "{{ (k3s_installed_version.rc == 0) and (k3s_version.split('+')[0] in (k3s_installed_version.stdout | default(''))) }}"
+
+- name: Init cluster (cluster-init on first server)
+  ansible.builtin.import_tasks: init.yml
+  when:
+    - k3s_action == 'init'
+    - not k3s_present
+
+- name: Join existing cluster (other servers)
+  ansible.builtin.import_tasks: join.yml
+  when:
+    - k3s_action == 'join'
+    - not k3s_present
+
+- name: Wait for k3s API to be ready
+  ansible.builtin.wait_for:
+    host: 127.0.0.1
+    port: 6443
+    timeout: 180

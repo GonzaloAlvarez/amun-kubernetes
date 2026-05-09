@@ -1,0 +1,35 @@
+---
+- name: Fetch kubeconfig from server
+  ansible.builtin.fetch:
+    src: /etc/rancher/k3s/k3s.yaml
+    dest: "{{ local_kubeconfig }}.raw"
+    flat: true
+  become: true
+
+- name: Rewrite server URL from 127.0.0.1 to {{ k3s_init_host }}
+  ansible.builtin.replace:
+    path: "{{ local_kubeconfig }}.raw"
+    regexp: 'https://127\.0\.0\.1:6443'
+    replace: "https://{{ k3s_init_host }}:6443"
+  delegate_to: localhost
+  become: false
+
+- name: Move raw kubeconfig into place
+  ansible.builtin.copy:
+    src: "{{ local_kubeconfig }}.raw"
+    dest: "{{ local_kubeconfig }}"
+    mode: "0600"
+    remote_src: false
+  delegate_to: localhost
+  become: false
+
+- name: Remove .raw scratch file
+  ansible.builtin.file:
+    path: "{{ local_kubeconfig }}.raw"
+    state: absent
+  delegate_to: localhost
+  become: false
+
+- name: Show kubeconfig path
+  ansible.builtin.debug:
+    msg: "Kubeconfig at {{ local_kubeconfig }}. Use: export KUBECONFIG={{ local_kubeconfig }}"

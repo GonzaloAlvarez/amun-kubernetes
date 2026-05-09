@@ -1,0 +1,22 @@
+---
+- name: Wait for all expected nodes to register with the API
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ local_kubeconfig }}"
+    kind: Node
+  register: node_list
+  until: (node_list.resources | length) >= ((groups['k3s_servers'] + groups['k3s_agents']) | length)
+  retries: 30
+  delay: 10
+
+- name: Label each node by subnet zone & storage role
+  kubernetes.core.k8s:
+    kubeconfig: "{{ local_kubeconfig }}"
+    state: patched
+    kind: Node
+    name: "{{ item.split('.')[0] }}"
+    definition:
+      metadata:
+        labels:
+          topology.kubernetes.io/zone: "{{ hostvars[item].subnet_zone }}"
+          storage.amun/role: "{{ 'replica' if (hostvars[item].longhorn_storage | default(false)) else 'none' }}"
+  loop: "{{ groups['k3s_servers'] + groups['k3s_agents'] }}"

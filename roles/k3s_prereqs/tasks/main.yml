@@ -1,0 +1,157 @@
+---
+# Raspberry Pi kernels (Debian + RPi-trixie) default-disable the memory cgroup
+# even on cgroup v2 to save RAM, so k3s fails its memory-cgroup check on first
+# install. We unconditionally ensure 'cgroup_memory=1 cgroup_enable=memory'
+# are in /boot/firmware/cmdline.txt and reboot if we had to add them.
+
+- name: Check whether memory cgroup controller is enabled
+  ansible.builtin.shell: |
+    set -o pipefail
+    if [[ -f /sys/fs/cgroup/cgroup.controllers ]]; then
+      grep -qw memory /sys/fs/cgroup/cgroup.controllers
+    else
+      [[ "$(awk '$1=="memory"{print $4}' /proc/cgroups)" == "1" ]]
+    fi
+  args:
+    executable: /bin/bash
+  register: memory_cgroup_check
+  failed_when: false
+  changed_when: false
+
+- name: Set memory_cgroup_enabled fact
+  ansible.builtin.set_fact:
+    memory_cgroup_enabled: "{{ memory_cgroup_check.rc == 0 }}"
+
+- name: Read current /boot/firmware/cmdline.txt
+  ansible.builtin.slurp:
+    src: "{{ cmdline_path }}"
+  register: cmdline_file
+  when: not memory_cgroup_enabled
+
+- name: Compute current cmdline string
+  ansible.builtin.set_fact:
+    current_cmdline: "{{ (cmdline_file.content | b64decode).strip() }}"
+  when: not memory_cgroup_enabled
+
+- name: Strip any 'cgroup_disable=memory' (firmware may inject it on Pi)
+  ansible.builtin.set_fact:
+    cleaned_cmdline: "{{ current_cmdline | regex_replace('cgroup_disable=memory\\b', '') }}"
+  when: not memory_cgroup_enabled
+
+- name: Append missing cgroup-enable params
+  ansible.builtin.set_fact:
+    desired_cmdline: >-
+      {{ cleaned_cmdline }}
+      {% for p in required_cmdline_params if p not in cleaned_cmdline %}
+      {{ p }}
+      {% endfor %}
+  when: not memory_cgroup_enabled
+
+- name: Normalize whitespace
+  ansible.builtin.set_fact:
+    desired_cmdline: "{{ desired_cmdline.split() | join(' ') }}"
+  when: not memory_cgroup_enabled
+
+- name: Stash a backup of cmdline.txt under /root/ (FAT32 boot partition rejects ':' in filenames)
+  ansible.builtin.copy:
+    src: "{{ cmdline_path }}"
+    dest: "/root/cmdline.txt.bak"
+    remote_src: true
+    force: false   # don't overwrite an earlier backup
+  when: not memory_cgroup_enabled
+
+- name: Write cmdline.txt and reboot if needed
+  ansible.builtin.copy:
+    dest: "{{ cmdline_path }}"
+    content: "{{ desired_cmdline }}\n"
+    owner: root
+    group: root
+    mode: "0755"
+  when:
+    - not memory_cgroup_enabled
+    - desired_cmdline | trim != current_cmdline | trim
+  notify: Reboot for cgroup
+
+- name: Disable swap (k3s requirement; zram swap is also disabled below)
+  ansible.builtin.command: swapoff -a
+  changed_when: false
+
+- name: Mask dphys-swapfile (if present)
+  ansible.builtin.systemd:
+    name: dphys-swapfile
+    enabled: false
+    state: stopped
+    masked: true
+  failed_when: false
+
+- name: Disable zramswap unit if present
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: false
+    state: stopped
+    masked: true
+  loop:
+    - zramswap.service
+    - zram-swap.service
+  failed_when: false
+
+- name: Load kernel modules required by k3s + Longhorn
+  community.general.modprobe:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - br_netfilter
+    - overlay
+    - iscsi_tcp
+  failed_when: false
+
+- name: Persist kernel modules
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/k3s.conf
+    content: |
+      br_netfilter
+      overlay
+      iscsi_tcp
+    mode: "0644"
+
+- name: Sysctl tuning for k8s
+  ansible.posix.sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    sysctl_file: /etc/sysctl.d/99-k3s.conf
+    reload: true
+    state: present
+  loop:
+    - { name: net.bridge.bridge-nf-call-iptables,  value: "1" }
+    - { name: net.bridge.bridge-nf-call-ip6tables, value: "1" }
+    - { name: net.ipv4.ip_forward,                 value: "1" }
+    - { name: vm.max_map_count,                    value: "262144" }
+    - { name: fs.inotify.max_user_instances,       value: "1024" }
+    - { name: fs.inotify.max_user_watches,         value: "1048576" }
+
+- name: Flush handlers (apply reboot if cmdline changed)
+  ansible.builtin.meta: flush_handlers
+
+# k3s nodes need to talk to each other on a handful of TCP/UDP ports for
+# etcd, the API, kubelet, flannel VXLAN, and pod-to-pod traffic. If `amun`'s
+# ufw role has been run on this host (default-deny INPUT), we add allow rules
+# scoped to the LAN and cluster CIDRs — keeping the firewall active for
+# outside traffic while letting cluster traffic flow.
+
+- name: Detect ufw
+  ansible.builtin.command: which ufw
+  register: ufw_check
+  failed_when: false
+  changed_when: false
+
+- name: Allow cluster traffic through ufw (LAN + pod/service CIDRs)
+  community.general.ufw:
+    rule: allow
+    from_ip: "{{ item }}"
+  loop:
+    - 10.1.0.0/16     # LAN A (rpid0/1/2/7/8)
+    - 10.0.0.0/24     # LAN B (rpid3-6/9/10)
+    - 10.42.0.0/16    # default flannel pod CIDR
+    - 10.43.0.0/16    # default service CIDR
+  when: ufw_check.rc == 0
+  notify: Reload ufw

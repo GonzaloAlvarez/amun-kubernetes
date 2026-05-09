@@ -1,0 +1,22 @@
+---
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: pool-10-0-0
+  namespace: metallb-system
+spec:
+  addresses:
+    - 10.0.0.200-10.0.0.220
+  autoAssign: true   # default pool
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: adv-10-0-0
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+    - pool-10-0-0
+  nodeSelectors:
+    - matchLabels:
+        topology.kubernetes.io/zone: net-10-0-0

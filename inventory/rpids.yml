@@ -1,0 +1,38 @@
+---
+all:
+  vars:
+    ansible_user: gonzalo
+    ansible_ssh_private_key_file: ~/.ssh/gonzalo_main_private_key.pem
+  children:
+    k3s_servers:
+      hosts:
+        # Control-plane nodes do NOT host Longhorn replicas — Longhorn's CSI
+        # plugin and engine-image DaemonSets don't tolerate the control-plane
+        # taint, so any pod that lands on rpid0/1/2 can't attach a Longhorn
+        # PVC. Storage replicas live on rpid3-rpid6 (the four 1TB workers).
+        rpid0.lan:
+          k3s_role: server-init
+          subnet_zone: net-10-1-1
+          longhorn_storage: false
+        rpid1.lan:
+          k3s_role: server-join
+          subnet_zone: net-10-1-1
+          longhorn_storage: false
+        rpid2.lan:
+          k3s_role: server-join
+          subnet_zone: net-10-1-1
+          longhorn_storage: false
+    k3s_agents:
+      hosts:
+        rpid3.lan:  { subnet_zone: net-10-0-0, longhorn_storage: true }
+        rpid4.lan:  { subnet_zone: net-10-0-0, longhorn_storage: true }
+        rpid5.lan:  { subnet_zone: net-10-0-0, longhorn_storage: true }
+        rpid6.lan:  { subnet_zone: net-10-0-0, longhorn_storage: true }
+        rpid7.lan:  { subnet_zone: net-10-1-1, longhorn_storage: false }
+        rpid8.lan:  { subnet_zone: net-10-1-1, longhorn_storage: false }
+        rpid9.lan:  { subnet_zone: net-10-0-0, longhorn_storage: false }
+        rpid10.lan: { subnet_zone: net-10-0-0, longhorn_storage: false }
+    excluded:
+      hosts:
+        rpid11.lan:
+          reason: "Pi 3B / 1GB RAM — too tight for k3s. Re-add as a low-priority worker once cluster is validated."

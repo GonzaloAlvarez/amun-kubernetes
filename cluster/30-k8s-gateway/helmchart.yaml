@@ -1,0 +1,32 @@
+---
+# k8s_gateway — CoreDNS plugin that auto-resolves Ingress + LoadBalancer Services
+# under our k8s.lan zone. pfSense Unbound Domain Override forwards k8s.lan
+# queries to the LoadBalancer IP of this Service (set by Ansible after install).
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: k8s-gateway
+  namespace: kube-system
+spec:
+  chart: k8s-gateway
+  repo: https://ori-edge.github.io/k8s_gateway/
+  targetNamespace: kube-system
+  createNamespace: false
+  valuesContent: |-
+    domain: k8s.lan
+    service:
+      type: LoadBalancer
+    watchedResources:
+      - "Ingress"
+      - "Service"
+    fallthrough:
+      enabled: false
+    ttl: 30
+    replicaCount: 2
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 128Mi

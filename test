@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# amun-kubernetes/test — quick syntax/lint check for the playbook + manifests.
+# Does NOT touch the cluster. Run after edits.
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR"
+
+if [[ "$OSTYPE" == darwin* ]]; then
+    VENV="${HOME}/Library/Application Support/amun/.venv"
+else
+    VENV="${HOME}/.local/share/amun/.venv"
+fi
+ANSIBLE_LINT="${VENV}/bin/ansible-lint"
+ANSIBLE_PB="${VENV}/bin/ansible-playbook"
+KUSTOMIZE="kustomize"
+
+echo "== ansible syntax check =="
+"${ANSIBLE_PB}" --syntax-check main.yml
+
+echo
+echo "== kustomize build cluster/ =="
+if command -v "${KUSTOMIZE}" >/dev/null 2>&1; then
+    "${KUSTOMIZE}" build cluster/ >/dev/null && echo "  cluster/ builds clean"
+else
+    kubectl kustomize cluster/ >/dev/null && echo "  cluster/ builds clean (via kubectl)"
+fi
+
+echo
+echo "== domain.py import =="
+"${VENV}/bin/python" -c "import importlib.util,sys; \
+    spec=importlib.util.spec_from_file_location('m','./domain.py'); \
+    m=importlib.util.module_from_spec(spec); spec.loader.exec_module(m); \
+    print('  domain.py imports clean')"
+
+echo
+echo "✓ all local checks passed"

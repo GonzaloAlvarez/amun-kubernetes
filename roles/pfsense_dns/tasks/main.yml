@@ -1,0 +1,24 @@
+---
+# Use the venv python explicitly so `requests` (installed by ./deploy via
+# requirements.txt) is on the import path. Falls back to /usr/bin/env python3
+# if amun_venv is not set (manual invocation).
+- name: Resolve python interpreter
+  ansible.builtin.set_fact:
+    domain_py_python: "{{ (amun_venv | default('')) + '/bin/python' if amun_venv is defined and amun_venv else 'python3' }}"
+
+- name: Run domain.py to ensure pfSense Domain Override for {{ dns_zone }}
+  ansible.builtin.command:
+    argv:
+      - "{{ domain_py_python }}"
+      - "./domain.py"
+      - "--domain"
+      - "{{ dns_zone }}"
+      - "--ip"
+      - "{{ k8s_gateway_ip }}"
+    chdir: "{{ playbook_dir }}"
+  register: domain_py
+  changed_when: "'created' in (domain_py.stdout | default('')) or 'updated' in (domain_py.stdout | default(''))"
+
+- name: Show domain.py output
+  ansible.builtin.debug:
+    msg: "{{ domain_py.stdout_lines | default([]) }}"

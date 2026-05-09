@@ -1,0 +1,29 @@
+---
+# k3s version pinning. Bump and re-run `./deploy` to roll forward.
+k3s_version: v1.31.4+k3s1
+
+# DNS zone owned by the cluster (k8s_gateway is authoritative for this).
+dns_zone: k8s.lan
+
+# k8s_gateway LoadBalancer IP. MUST be in pool-10-0-0 (so it's reachable from
+# every Pi via routed L3) and MUST match the pfSense Domain Override target.
+k8s_gateway_ip: 10.0.0.210
+
+# MetalLB pools (one per L2 segment).
+metallb_pools:
+  - name: pool-10-1-1
+    addresses: ["10.1.1.200-10.1.1.220"]
+    zone: net-10-1-1
+  - name: pool-10-0-0
+    addresses: ["10.0.0.200-10.0.0.220"]
+    zone: net-10-0-0
+
+# Cluster networking (defaults for k3s + flannel VXLAN).
+cluster_cidr: 10.42.0.0/16
+service_cidr: 10.43.0.0/16
+
+# Local kubeconfig path (rewritten to point at rpid0).
+local_kubeconfig: "{{ lookup('env', 'HOME') }}/.kube/config-rpid"
+
+# Init server (the cluster-init host). Other servers join via this.
+k3s_init_host: rpid0.lan

@@ -1,0 +1,10 @@
+---
+k3s_server_extra_args: >-
+  --disable=servicelb
+  --disable=traefik
+  --disable=local-storage
+  --tls-san={{ inventory_hostname }}
+  --node-taint=node-role.kubernetes.io/control-plane=true:NoSchedule
+  --kubelet-arg=eviction-hard=memory.available<150Mi
+  --cluster-cidr={{ cluster_cidr }}
+  --service-cidr={{ service_cidr }}

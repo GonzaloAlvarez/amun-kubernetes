@@ -1,0 +1,9 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# User-managed services. Add one line per app — local path or remote git URL.
+# Example apps:
+#   - github.com/GonzaloAlvarez/cn-helloworld//k8s?ref=main
+#   - github.com/GonzaloAlvarez/cn-grafana//k8s?ref=main
+resources:
+  - github.com/GonzaloAlvarez/cn-helloworld//k8s?ref=main

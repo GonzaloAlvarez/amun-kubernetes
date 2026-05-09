@@ -1,0 +1,5 @@
+---
+cmdline_path: /boot/firmware/cmdline.txt
+required_cmdline_params:
+  - cgroup_memory=1
+  - cgroup_enable=memory

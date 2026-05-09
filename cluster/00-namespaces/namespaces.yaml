@@ -1,0 +1,8 @@
+---
+# metallb-system and ingress-nginx are created by their upstream
+# manifests/charts; declaring them here would duplicate. Only longhorn-system
+# is pre-created (amun-longhorn applies the HelmChart into it).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: longhorn-system
