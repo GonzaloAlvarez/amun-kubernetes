@@ -7,3 +7,4 @@ kind: Kustomization
 #   - github.com/GonzaloAlvarez/cn-grafana//k8s?ref=main
 resources:
   - github.com/GonzaloAlvarez/cn-helloworld//k8s?ref=main
+  - github.com/GonzaloAlvarez/cn-netbox//k8s?ref=main
