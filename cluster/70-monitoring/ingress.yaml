@@ -1,0 +1,39 @@
+---
+# Expose cluster Prometheus + Alertmanager via ingress-nginx so VPS Grafana
+# can query them via http://10.0.0.201 (the proven-good ingress LB) with a
+# Host header. Keeps everything on a single tested route.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: prometheus
+  namespace: monitoring
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: prometheus.k8s.lan
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: prom-prometheus, port: { number: 9090 } }
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: alertmanager
+  namespace: monitoring
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: alertmanager.k8s.lan
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: prom-alertmanager, port: { number: 9093 } }

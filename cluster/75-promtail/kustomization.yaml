@@ -3,3 +3,4 @@ kind: Kustomization
 resources:
   - loki.yaml
   - promtail.yaml
+  - ingress.yaml
