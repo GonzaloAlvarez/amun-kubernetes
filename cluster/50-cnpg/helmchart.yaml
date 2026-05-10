@@ -14,7 +14,10 @@ spec:
   createNamespace: true
   valuesContent: |-
     monitoring:
-      podMonitorEnabled: true       # picked up automatically once kube-prometheus-stack lands
+      # Phase 3 will install kube-prometheus-stack (which provides the PodMonitor
+      # CRD); flip this to true after that. Set false now or the chart's pre-install
+      # validation rejects the manifest because PodMonitor doesn't exist yet.
+      podMonitorEnabled: false
       grafanaDashboard:
         create: false               # Grafana is on VPS; we'll provision dashboards there
     resources:

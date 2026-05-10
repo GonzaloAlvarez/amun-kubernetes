@@ -22,7 +22,7 @@ spec:
     force: true
     skipWaitForDeleteTimeout: 60
     ignoreDaemonSets: true
-    deleteEmptyDirData: true
+    deleteEmptydirData: true
   prepare:
     image: rancher/k3s-upgrade
     args: [ "prepare", "k3s-server" ]   # waits for the server Plan to finish first
