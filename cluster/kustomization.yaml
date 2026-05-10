@@ -8,3 +8,6 @@ resources:
   - 45-sealed-secrets
   - 50-cnpg
   - 60-system-upgrade
+  - 70-monitoring
+  - 75-promtail
+  - 80-tailscale-router

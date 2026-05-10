@@ -1,0 +1,94 @@
+---
+# kube-prometheus-stack: Prometheus + Alertmanager + Prometheus Operator +
+# kube-state-metrics + node-exporter (DaemonSet). Grafana is intentionally
+# disabled — VPS Grafana stays the visualization layer; it gets data-sourced
+# at the cluster Prometheus LoadBalancer IP via the existing tailnet route.
+#
+# RAM accounting on the Pi 4 fleet (4GB nodes):
+#   prometheus     ~700Mi  (6h retention, ~5k series)
+#   alertmanager   ~80Mi
+#   operator       ~150Mi
+#   kube-state     ~150Mi
+#   node-exporter  ~50Mi × 11 nodes
+# Total cluster overhead: ~1.6Gi spread across the fleet. Per-node ~150-200Mi
+# extra (acceptable on 4GB nodes that already run k3s + longhorn).
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: kube-prometheus-stack
+  namespace: kube-system
+spec:
+  chart: kube-prometheus-stack
+  repo: https://prometheus-community.github.io/helm-charts
+  targetNamespace: monitoring
+  createNamespace: false   # we created it ourselves
+  valuesContent: |-
+    fullnameOverride: prom
+
+    # Prometheus
+    prometheus:
+      prometheusSpec:
+        retention: 6h
+        retentionSize: 2GB
+        scrapeInterval: 30s
+        serviceMonitorSelectorNilUsesHelmValues: false
+        podMonitorSelectorNilUsesHelmValues: false
+        ruleSelectorNilUsesHelmValues: false
+        probeSelectorNilUsesHelmValues: false
+        # Tight Pi-4 limits
+        resources:
+          requests: { cpu: 200m, memory: 512Mi }
+          limits:   { cpu: 1500m, memory: 1Gi }
+        storageSpec:
+          volumeClaimTemplate:
+            spec:
+              storageClassName: longhorn
+              resources: { requests: { storage: 5Gi } }
+      service:
+        type: LoadBalancer
+        annotations:
+          metallb.universe.tf/loadBalancerIPs: "10.0.0.202"
+          metallb.io/address-pool: pool-10-0-0
+        port: 9090
+
+    # Alertmanager
+    alertmanager:
+      alertmanagerSpec:
+        resources:
+          requests: { cpu: 50m, memory: 64Mi }
+          limits:   { cpu: 200m, memory: 128Mi }
+        storage:
+          volumeClaimTemplate:
+            spec:
+              storageClassName: longhorn
+              resources: { requests: { storage: 1Gi } }
+      service:
+        type: LoadBalancer
+        annotations:
+          metallb.universe.tf/loadBalancerIPs: "10.0.0.203"
+          metallb.io/address-pool: pool-10-0-0
+        port: 9093
+
+    # Disable in-cluster Grafana — VPS Grafana queries cluster Prom directly
+    grafana:
+      enabled: false
+
+    # Operator
+    prometheusOperator:
+      resources:
+        requests: { cpu: 50m, memory: 96Mi }
+        limits:   { cpu: 200m, memory: 192Mi }
+
+    # kube-state-metrics
+    kube-state-metrics:
+      resources:
+        requests: { cpu: 50m, memory: 96Mi }
+        limits:   { cpu: 200m, memory: 192Mi }
+
+    # node-exporter — must run on EVERY node (including control-plane)
+    prometheus-node-exporter:
+      tolerations:
+        - operator: Exists
+      resources:
+        requests: { cpu: 25m, memory: 32Mi }
+        limits:   { cpu: 100m, memory: 64Mi }
