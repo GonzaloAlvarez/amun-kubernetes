@@ -66,17 +66,15 @@ spec:
             - name: TS_HOSTNAME
               value: k8s-router
             - name: TS_EXTRA_ARGS
-              value: "--login-server=https://hs.gn.al --advertise-routes=10.0.0.200/27 --accept-routes=false"
-            - name: TS_TAILSCALED_EXTRA_ARGS
-              value: "--tun-mtu=1280"
+              value: "--login-server=https://hs.gn.al --accept-routes=false"
+            - name: TS_ROUTES
+              value: "10.0.0.200/27"
             - name: TS_ACCEPT_DNS
               value: "false"
             - name: TS_USERSPACE
               value: "false"
             - name: TS_STATE_DIR
               value: /var/lib/tailscale
-            - name: TS_KUBE_SECRET
-              value: ""
           volumeMounts:
             - name: state
               mountPath: /var/lib/tailscale
