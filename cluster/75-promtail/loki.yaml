@@ -14,6 +14,12 @@ spec:
   createNamespace: false
   valuesContent: |-
     deploymentMode: SingleBinary
+    # Force-zero the scalable mode replicas; default values have non-zero
+    # backend/read/write replicas that fail the chart's validate.yaml when
+    # singleBinary.replicas > 0.
+    backend: { replicas: 0 }
+    read: { replicas: 0 }
+    write: { replicas: 0 }
     loki:
       auth_enabled: false
       commonConfig: { replication_factor: 1 }
