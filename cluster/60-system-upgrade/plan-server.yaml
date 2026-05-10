@@ -1,0 +1,29 @@
+---
+# k3s SERVER nodes (rpid0/1/2): upgrade serially, drain first, follow stable channel.
+# This Plan only acts when the channel reports a version DIFFERENT from the
+# label `plan.upgrade.cattle.io/k3s-server` already on the node — so it's a
+# no-op until upstream releases. Bump or pin via `version:` if you prefer.
+apiVersion: upgrade.cattle.io/v1
+kind: Plan
+metadata:
+  name: k3s-server
+  namespace: system-upgrade
+  labels:
+    k3s-upgrade: server
+spec:
+  concurrency: 1                    # one server at a time; HA stays up
+  serviceAccountName: system-upgrade
+  nodeSelector:
+    matchExpressions:
+      - { key: node-role.kubernetes.io/control-plane, operator: Exists }
+  tolerations:
+    - { operator: Exists }
+  cordon: true
+  drain:
+    force: true
+    skipWaitForDeleteTimeout: 60
+    ignoreDaemonSets: true
+    deleteEmptyDirData: true
+  upgrade:
+    image: rancher/k3s-upgrade
+  channel: https://update.k3s.io/v1-release/channels/stable

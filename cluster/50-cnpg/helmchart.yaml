@@ -1,0 +1,22 @@
+---
+# CloudNativePG operator. Postgres-as-a-CR for any cn-* app that needs it.
+# Each app declares `kind: Cluster` (postgresql.cnpg.io/v1) in its own namespace.
+# Native PITR + Barman → S3.
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: cnpg
+  namespace: kube-system
+spec:
+  chart: cloudnative-pg
+  repo: https://cloudnative-pg.github.io/charts
+  targetNamespace: cnpg-system
+  createNamespace: true
+  valuesContent: |-
+    monitoring:
+      podMonitorEnabled: true       # picked up automatically once kube-prometheus-stack lands
+      grafanaDashboard:
+        create: false               # Grafana is on VPS; we'll provision dashboards there
+    resources:
+      requests: { cpu: 100m, memory: 128Mi }
+      limits:   { cpu: 500m, memory: 256Mi }

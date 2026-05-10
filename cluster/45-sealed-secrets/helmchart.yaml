@@ -1,0 +1,23 @@
+---
+# bitnami-labs sealed-secrets controller. Encrypted Secrets in git, decrypted
+# in-cluster via the controller's private key. Survives a full cluster rebuild
+# as long as the controller's key is backed up (kubectl get secret -n kube-system
+# -l sealedsecrets.bitnami.com/sealed-secrets-key=active).
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: sealed-secrets
+  namespace: kube-system
+spec:
+  chart: sealed-secrets
+  repo: https://bitnami-labs.github.io/sealed-secrets
+  targetNamespace: kube-system
+  createNamespace: false
+  valuesContent: |-
+    fullnameOverride: sealed-secrets-controller
+    metrics:
+      serviceMonitor:
+        enabled: false       # we'll flip to true after kube-prometheus-stack lands
+    resources:
+      requests: { cpu: 50m, memory: 64Mi }
+      limits:   { cpu: 200m, memory: 128Mi }

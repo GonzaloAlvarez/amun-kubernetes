@@ -1,0 +1,31 @@
+---
+# k3s AGENT nodes (rpid3..rpid10): can upgrade two at a time. Drains, reboots
+# if needed (via the upgrade image), uncordons. Workloads reschedule via
+# antiAffinity / replication.
+apiVersion: upgrade.cattle.io/v1
+kind: Plan
+metadata:
+  name: k3s-agent
+  namespace: system-upgrade
+  labels:
+    k3s-upgrade: agent
+spec:
+  concurrency: 2
+  serviceAccountName: system-upgrade
+  nodeSelector:
+    matchExpressions:
+      - { key: node-role.kubernetes.io/control-plane, operator: DoesNotExist }
+  tolerations:
+    - { operator: Exists }
+  cordon: true
+  drain:
+    force: true
+    skipWaitForDeleteTimeout: 60
+    ignoreDaemonSets: true
+    deleteEmptyDirData: true
+  prepare:
+    image: rancher/k3s-upgrade
+    args: [ "prepare", "k3s-server" ]   # waits for the server Plan to finish first
+  upgrade:
+    image: rancher/k3s-upgrade
+  channel: https://update.k3s.io/v1-release/channels/stable

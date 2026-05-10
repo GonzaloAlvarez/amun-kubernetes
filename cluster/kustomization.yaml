@@ -5,3 +5,6 @@ resources:
   - 10-metallb
   - 30-k8s-gateway
   - 40-ingress-nginx
+  - 45-sealed-secrets
+  - 50-cnpg
+  - 60-system-upgrade
