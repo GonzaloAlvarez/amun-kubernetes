@@ -1,6 +1,6 @@
 ---
 # Single Tailscale subnet router pod for the cluster. Advertises the cluster's
-# MetalLB pool (10.0.0.200/27) onto the tailnet so VPS Traefik (and any
+# MetalLB pool (10.0.0.192/27) onto the tailnet so VPS Traefik (and any
 # tailnet-connected admin client) can reach `<svc>.lab.gn.al` services routed
 # through ingress-nginx (10.0.0.201). Future cn-* services don't need their
 # own Tailscale identity — they inherit this route.
@@ -68,7 +68,7 @@ spec:
             - name: TS_EXTRA_ARGS
               value: "--login-server=https://hs.gn.al --accept-routes=false"
             - name: TS_ROUTES
-              value: "10.0.0.200/27"
+              value: "10.0.0.192/27"
             - name: TS_ACCEPT_DNS
               value: "false"
             - name: TS_USERSPACE
