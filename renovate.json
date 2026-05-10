@@ -1,0 +1,44 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard",
+    ":semanticCommits",
+    ":automergePatch",
+    ":enableVulnerabilityAlertsWithLabel(security)"
+  ],
+  "timezone": "America/New_York",
+  "schedule": ["after 9pm and before 6am every weekday", "every weekend"],
+  "labels": ["dependencies"],
+  "kubernetes": { "fileMatch": ["cluster/.+\\.ya?ml$", "deployment/.+\\.ya?ml$"] },
+  "customManagers": [
+    {
+      "customType": "regex",
+      "fileMatch": ["cluster/.+/helmchart\\.ya?ml$"],
+      "matchStrings": [
+        "chart:\\s*(?<depName>[\\w-]+)\\s*\\n\\s*repo:\\s*(?<registryUrl>https?://\\S+)\\s*\\n(?:[^\\n]*\\n)*?\\s*version:\\s*[\"']?(?<currentValue>[\\w.\\-]+?)[\"']?\\s*$"
+      ],
+      "datasourceTemplate": "helm"
+    },
+    {
+      "customType": "regex",
+      "fileMatch": ["cluster/.+\\.ya?ml$"],
+      "matchStrings": [
+        "image:\\s*\\n\\s*(?:registry:\\s*(?<registryUrl>\\S+)\\s*\\n\\s*)?repository:\\s*(?<depName>\\S+)\\s*\\n(?:\\s*\\S+:\\s*\\S+\\s*\\n)*?\\s*tag:\\s*[\"']?(?<currentValue>[\\w.\\-]+)[\"']?"
+      ],
+      "datasourceTemplate": "docker"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "Cluster bootstrap charts: PR-only for major bumps; auto for patch.",
+      "matchManagers": ["custom.regex"],
+      "matchUpdateTypes": ["patch", "pin", "digest"],
+      "automerge": true
+    },
+    {
+      "matchUpdateTypes": ["minor", "major"],
+      "automerge": false
+    }
+  ]
+}
