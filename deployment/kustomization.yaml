@@ -9,3 +9,4 @@ resources:
   - github.com/GonzaloAlvarez/cn-helloworld//k8s?ref=main
   - github.com/GonzaloAlvarez/cn-netbox//k8s?ref=main
   - github.com/GonzaloAlvarez/cn-kb-filemanager//k8s?ref=main
+  - github.com/GonzaloAlvarez/cn-cluster-ui//k8s?ref=main
