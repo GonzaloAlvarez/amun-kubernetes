@@ -32,7 +32,7 @@ DESCRIPTION = (
 # Per user preference: always create a fresh venv next to this script, install
 # `requests` into it, then re-exec — and tear the venv down on exit. No
 # caching, no sharing across tools.
-_VENV = Path(__file__).resolve().parent / ".venv-domain"
+_VENV = Path(__file__).resolve().parent / ".venv"
 _in_venv = hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix
 
 if not _in_venv:
