@@ -18,6 +18,9 @@ kubectl get nodes
 The first run prompts for your **pfSense username + password** so `domain.py`
 can program the `k8s.lan` Domain Override. The credentials are cached at
 `./.pf-creds` (chmod 600, gitignored). Re-run anytime; everything is idempotent.
+The same credentials are Kauket-managed as `pfsense.admin_creds` — on a fresh
+machine, `kauket get pfsense.admin_creds --stdout > .pf-creds && chmod 600
+.pf-creds` skips the prompt.
 
 ## Layout
 
